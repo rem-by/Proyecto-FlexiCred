@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>FlexiCred</title>
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#123C4C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FlexiCred">
+<style>
+  :root{
+    --cover:#123C4C;
+    --cover-dark:#0B2733;
+    --paper:#EAFBF1;
+    --paper-line:#BCE6CE;
+    --ink:#123C4C;
+    --ink-soft:#4E7570;
+    --brass:#1E9C82;
+    --brass-soft:#7ADB78;
+    --red:#1B8FC4;
+    --green:#1E9C82;
+    --radius:2px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cover);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  .num{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;}
+  header{
+    background:var(--cover);
+    color:var(--paper);
+    padding:24px 20px 22px;
+    border-bottom:6px solid var(--brass);
+  }
+  .marca{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:4px;
+  }
+  .marca-logo{
+    width:36px;
+    height:36px;
+    border-radius:8px;
+    display:block;
+    flex:0 0 auto;
+  }
+  header h1{
+    font-family:Georgia,"Iowan Old Style","Times New Roman",serif;
+    font-size:26px;
+    font-weight:600;
+    margin:0;
+    letter-spacing:0.2px;
+  }
+  .marca-presta{color:var(--paper);}
+  .marca-app{color:var(--brass-soft);}
+  header p{margin:0;font-size:13px;color:#9BD6C8;}
+  .resumen{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:1px;
+    background:var(--cover-dark);
+    margin:16px 16px 0;
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .resumen .celda{
+    background:var(--cover);
+    padding:12px 10px;
+    text-align:center;
+  }
+  .resumen .celda .lbl{font-size:11px;color:#7FB8AC;margin-bottom:4px;}
+  .resumen .celda .val{font-size:17px;color:var(--paper);font-weight:600;}
+  .resumen .celda.pendiente .val{color:var(--brass-soft);}
+
+  main{
+    background:var(--paper);
+    margin:16px 12px 0;
+    border-radius:var(--radius) var(--radius) 0 0;
+    min-height:60vh;
+    padding:4px 0 24px;
+  }
+  .tabs{
+    display:flex;
+    border-bottom:1px solid var(--paper-line);
+    margin:0 16px;
+  }
+  .tab-btn{
+    flex:1;
+    background:none;
+    border:none;
+    padding:14px 0 12px;
+    font-size:14px;
+    font-weight:600;
+    color:var(--ink-soft);
+    border-bottom:2px solid transparent;
+  }
+  .tab-btn.active{
+    color:var(--cover);
+    border-bottom-color:var(--brass);
+  }
+  .toolbar{
+    display:flex;
+    gap:8px;
+    padding:16px 16px 8px;
+  }
+  button{
+    font-family:inherit;
+    cursor:pointer;
+    border:none;
+    border-radius:var(--radius);
+  }
+  .btn-primary{
+    background:var(--cover);
+    color:var(--paper);
+    padding:11px 16px;
+    font-size:14px;
+    font-weight:600;
+    flex:1;
+  }
+  .btn-secondary{
+    background:transparent;
+    color:var(--cover);
+    border:1px solid var(--paper-line);
+    padding:11px 16px;
+    font-size:14px;
+    font-weight:600;
+  }
+  .lista{padding:4px 16px;}
+  .fila-prestatario{
+    border-bottom:1px solid var(--paper-line);
+    padding:14px 2px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+  }
+  .fila-prestatario:last-child{border-bottom:none;}
+  .fp-info .nombre{font-size:16px;font-weight:600;color:var(--ink);}
+  .fp-info .meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .fp-saldo{text-align:right;}
+  .fp-saldo .monto{font-size:16px;font-weight:600;}
+  .fp-saldo .monto.debe{color:var(--red);}
+  .fp-saldo .monto.saldado{color:var(--green);}
+  .fp-saldo .etiqueta{font-size:11px;color:var(--ink-soft);}
+  .vacio{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--ink-soft);
+    font-size:14px;
+  }
+
+  .overlay{
+    position:fixed;inset:0;
+    background:rgba(18,40,31,0.55);
+    display:none;
+    align-items:flex-end;
+    z-index:50;
+  }
+  .overlay.show{display:flex;}
+  .hoja{
+    background:var(--paper);
+    width:100%;
+    max-height:92vh;
+    overflow-y:auto;
+    border-radius:14px 14px 0 0;
+    padding:18px 18px 30px;
+    animation:subir .18s ease-out;
+  }
+  @keyframes subir{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .hoja h2{
+    font-family:Georgia,serif;
+    font-size:19px;
+    margin:0 0 14px;
+    color:var(--cover);
+  }
+  .hoja h3{
+    font-size:13px;
+    text-transform:none;
+    color:var(--ink-soft);
+    margin:18px 0 8px;
+    border-top:1px solid var(--paper-line);
+    padding-top:14px;
+  }
+  label{
+    display:block;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin:10px 0 4px;
+  }
+  input,select{
+    width:100%;
+    padding:10px 10px;
+    font-size:15px;
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    background:#fff;
+    font-family:inherit;
+    color:var(--ink);
+  }
+  .fila-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .hoja .acciones{
+    display:flex;gap:8px;margin-top:18px;
+  }
+  .cerrar{
+    position:absolute;top:14px;right:16px;
+    background:none;border:none;font-size:22px;color:var(--ink-soft);
+    line-height:1;
+  }
+  .hoja{position:relative;}
+
+  .prestamo-card{
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:12px;
+    margin-bottom:10px;
+    background:#fff;
+  }
+  .prestamo-card .fila{
+    display:flex;justify-content:space-between;font-size:13px;
+    padding:3px 0;
+  }
+  .prestamo-card .fila .k{color:var(--ink-soft);}
+  .prestamo-card .fila .v{font-weight:600;}
+  .prestamo-card .saldo-line{
+    border-top:1px dashed var(--paper-line);
+    margin-top:8px;padding-top:8px;
+    display:flex;justify-content:space-between;
+    font-size:15px;font-weight:700;
+  }
+  .prestamo-card .btns{display:flex;gap:6px;margin-top:10px;}
+  .btn-mini{
+    flex:1;
+    background:var(--cover);
+    color:var(--paper);
+    padding:8px;
+    font-size:12.5px;
+    font-weight:600;
+    border-radius:var(--radius);
+  }
+  .btn-mini.alt{background:transparent;color:var(--cover);border:1px solid var(--paper-line);}
+
+  .movimiento{
+    display:flex;justify-content:space-between;
+    padding:7px 0;
+    border-bottom:1px solid var(--paper-line);
+    font-size:13px;
+  }
+  .movimiento:last-child{border-bottom:none;}
+  .movimiento .tipo-salida{color:var(--red);}
+  .movimiento .tipo-entrada{color:var(--green);}
+  .movimiento .tipo-interes{color:var(--brass);}
+  .movimiento .fecha{color:var(--ink-soft);font-size:11.5px;}
+
+  textarea{
+    width:100%;min-height:180px;
+    font-family:ui-monospace,monospace;
+    font-size:13px;
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:10px;
+    background:#fff;
+    color:var(--ink);
+  }
+  .copiado{
+    font-size:12px;color:var(--green);font-weight:600;
+    height:16px;margin-top:6px;
+  }
+  .informe-linea{
+    display:flex;justify-content:space-between;
+    padding:6px 0;font-size:13.5px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  .informe-total{
+    display:flex;justify-content:space-between;
+    padding-top:10px;margin-top:6px;
+    border-top:2px solid var(--cover);
+    font-weight:700;
+  }
+  #areaImprimir{display:none;}
+  #areaImprimir table{width:100%;border-collapse:collapse;margin-top:10px;}
+  #areaImprimir th,#areaImprimir td{border:1px solid #999;padding:6px 8px;text-align:left;font-size:12px;}
+  #areaImprimir tfoot td{font-weight:700;}
+  @media print{
+    body *{visibility:hidden;}
+    #areaImprimir, #areaImprimir *{visibility:visible;}
+    #areaImprimir{display:block;position:absolute;top:0;left:0;width:100%;padding:24px;}
+  }
+</style>
+</head>
+<body>
+<div id="areaImprimir"></div>
+
+<header>
+  <div class="marca">
+    <img class="marca-logo" src="icon-192.png" alt="FlexiCred">
+    <h1><span class="marca-presta">Flexi</span><span class="marca-app">Cred</span></h1>
+  </div>
+  <p>Registro personal de préstamos · datos guardados solo en este teléfono</p>
+  <div class="resumen">
+    <div class="celda"><div class="lbl">Prestado</div><div class="val num" id="rTotalPrestado">$0</div></div>
+    <div class="celda"><div class="lbl">Cobrado</div><div class="val num" id="rTotalCobrado">$0</div></div>
+    <div class="celda pendiente"><div class="lbl">Pendiente</div><div class="val num" id="rTotalPendiente">$0</div></div>
+  </div>
+</header>
+
+<main>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabBtnClientes" onclick="cambiarVista('clientes')">Clientes</button>
+    <button class="tab-btn" id="tabBtnCartera" onclick="cambiarVista('cartera')">Cartera</button>
+  </div>
+
+  <div id="vistaClientes">
+    <div class="toolbar">
+      <button class="btn-primary" onclick="abrirNuevoPrestatario()">+ Nuevo prestatario</button>
+      <button class="btn-secondary" onclick="abrirInforme()">Informe</button>
+      <button class="btn-secondary" style="flex:0 0 46px;padding:11px 0;font-size:17px;" onclick="abrirConfiguracion()">⚙</button>
+    </div>
+    <div class="lista" id="lista"></div>
+  </div>
+
+  <div id="vistaCartera" style="display:none;">
+    <div class="toolbar">
+      <button class="btn-primary" onclick="abrirNuevaCartera()">+ Nueva cartera</button>
+    </div>
+    <div style="padding:0 16px;">
+      <label>Ver cartera</label>
+      <select id="carteraSeleccionada" onchange="renderClientesCartera()"></select>
+    </div>
+    <div class="acciones" style="padding:0 16px;">
+      <button class="btn-secondary" style="flex:1;color:var(--red);border-color:var(--red);" onclick="eliminarCarteraSeleccionada()">Eliminar esta cartera</button>
+    </div>
+    <div class="lista" id="listaCartera"></div>
+  </div>
+</main>
+
+<!-- Overlay: nueva cartera -->
+<div class="overlay" id="ovNuevaCartera">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovNuevaCartera')">×</button>
+    <h2>Nueva cartera</h2>
+    <label>Nombre</label>
+    <input id="ncNombre" placeholder="Ej: Familia, Amigos, Trabajo">
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarNuevaCartera()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: nuevo prestatario -->
+<div class="overlay" id="ovPrestatario">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovPrestatario')">×</button>
+    <h2>Nuevo prestatario</h2>
+    <label>Nombre</label>
+    <input id="npNombre" placeholder="Nombre completo">
+    <label>Teléfono (opcional, para WhatsApp)</label>
+    <input id="npTelefono" placeholder="6000-0000">
+    <label>Cartera</label>
+    <select id="npCartera"></select>
+    <label>Frecuencia de pago</label>
+    <select id="npFrecuencia">
+      <option value="bisemanal">Bisemanal (cada 14 días)</option>
+      <option value="quincenal">Quincenal (15 y 30 de cada mes)</option>
+    </select>
+    <h3>Primer préstamo</h3>
+    <div class="fila-2">
+      <div><label>Capital prestado</label><input id="npCapital" type="number" step="0.01" placeholder="0.00"></div>
+      <div><label>Interés por período (%)</label><input id="npTasa" type="number" step="0.1" placeholder="10"></div>
+    </div>
+    <label>Fecha del préstamo</label>
+    <input id="npFecha" type="date">
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarNuevoPrestatario()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: editar datos del cliente -->
+<div class="overlay" id="ovEditarCliente">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovEditarCliente')">×</button>
+    <h2>Editar cliente</h2>
+    <label>Nombre</label>
+    <input id="ecNombre" placeholder="Nombre completo">
+    <label>Teléfono</label>
+    <input id="ecTelefono" placeholder="6000-0000">
+    <label>Cartera</label>
+    <select id="ecCartera"></select>
+    <label>Frecuencia de pago</label>
+    <select id="ecFrecuencia">
+      <option value="bisemanal">Bisemanal (cada 14 días)</option>
+      <option value="quincenal">Quincenal (15 y 30 de cada mes)</option>
+    </select>
+    <label>Interés por período (%)</label>
+    <input id="ecTasa" type="number" step="0.1" placeholder="10">
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarEdicionCliente()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: editar movimiento (desembolso o pago) -->
+<div class="overlay" id="ovEditarMovimiento">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovEditarMovimiento')">×</button>
+    <h2 id="emTitulo">Editar movimiento</h2>
+    <label>Monto</label>
+    <input id="emMonto" type="number" step="0.01" placeholder="0.00">
+    <label>Fecha</label>
+    <input id="emFecha" type="date">
+    <div id="emNotaWrap">
+      <label>Nota</label>
+      <input id="emNota" placeholder="Ej: abono quincenal">
+    </div>
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarEdicionMovimiento()">Guardar cambios</button>
+    </div>
+    <div class="acciones">
+      <button class="btn-secondary" style="flex:1;color:var(--red);border-color:var(--red);" onclick="eliminarMovimiento()">Eliminar este movimiento</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: detalle de prestatario -->
+<div class="overlay" id="ovDetalle">
+  <div class="hoja" id="hojaDetalle"></div>
+</div>
+
+<!-- Overlay: nuevo desembolso -->
+<div class="overlay" id="ovNuevoPrestamo">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovNuevoPrestamo')">×</button>
+    <h2>Nuevo desembolso</h2>
+    <p style="font-size:12.5px;color:var(--ink-soft);margin:0 0 4px;">Este monto se suma al capital que ya tiene el cliente.</p>
+    <label>Monto prestado</label>
+    <input id="qpCapital" type="number" step="0.01" placeholder="0.00">
+    <label>Fecha del desembolso</label>
+    <input id="qpFecha" type="date">
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarNuevoDesembolso()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: registrar pago -->
+<div class="overlay" id="ovPago">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovPago')">×</button>
+    <h2>Registrar pago</h2>
+    <label>Monto recibido</label>
+    <input id="pgMonto" type="number" step="0.01" placeholder="0.00">
+    <label>Fecha</label>
+    <input id="pgFecha" type="date">
+    <label>Nota (opcional)</label>
+    <input id="pgNota" placeholder="Ej: abono quincenal">
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarPago()">Guardar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: mensaje WhatsApp -->
+<div class="overlay" id="ovWA">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovWA')">×</button>
+    <h2>Mensaje para WhatsApp</h2>
+    <textarea id="waTexto" readonly></textarea>
+    <div class="copiado" id="waCopiado"></div>
+    <div class="acciones">
+      <button class="btn-primary" onclick="copiarWA()">Copiar mensaje</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: informe mensual -->
+<div class="overlay" id="ovInforme">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovInforme')">×</button>
+    <h2>Informe mensual</h2>
+    <input id="ifMes" type="month">
+    <div class="acciones">
+      <button class="btn-primary" onclick="generarInforme()">Generar</button>
+    </div>
+    <div id="ifResultado" style="margin-top:16px;"></div>
+  </div>
+</div>
+
+<!-- Overlay: configuración -->
+<div class="overlay" id="ovConfig">
+  <div class="hoja">
+    <button class="cerrar" onclick="cerrar('ovConfig')">×</button>
+    <h2>Configuración</h2>
+
+    <label>Interés bisemanal por defecto (%)</label>
+    <input id="cfgTasa" type="number" step="0.1" placeholder="10">
+    <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">Se precarga automáticamente al crear un nuevo prestatario. Puedes cambiarlo caso por caso.</p>
+
+    <label style="margin-top:16px;">Período de gracia (días)</label>
+    <input id="cfgGracia" type="number" step="1" min="0" max="14" placeholder="0">
+    <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">Desde el segundo cobro en adelante, el interés se genera este número de días ANTES de la fecha oficial de corte (no después). Tope de 13 días para clientes bisemanales y 14 para quincenales — si pones un número mayor, se ajusta automáticamente. El primer cobro (inmediato, al desembolsar) y el calendario de cortes no cambian.</p>
+
+    <div class="acciones">
+      <button class="btn-primary" onclick="guardarConfiguracion()">Guardar configuración</button>
+    </div>
+
+    <h3>Clientes eliminados (histórico)</h3>
+    <div id="cfgEliminados"></div>
+    <div class="acciones">
+      <button class="btn-secondary" style="flex:1" onclick="descargarClientesEliminados()">Descargar histórico (CSV)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const DIA_MS = 86400000;
+const PERIODO_DIAS = 14;
+
+function cargarDatos(){
+  try{
+    const raw = localStorage.getItem('libro_prestamos_v1');
+    const data = raw ? JSON.parse(raw) : { prestatarios: [] };
+    return migrarDatos(data);
+  }catch(e){ return { prestatarios: [] }; }
+}
+
+// Convierte datos de una versión anterior (préstamos separados por tarjeta) al
+// modelo actual: una sola cuenta por cliente donde cada préstamo nuevo se suma
+// al capital que ya tenía.
+function migrarDatos(data){
+  data.prestatarios = (data.prestatarios||[]).map(pr=>{
+    if(pr.prestamos){
+      const tasa = pr.prestamos[0] ? pr.prestamos[0].tasa : 0;
+      const desembolsos = pr.prestamos.map(p=>({ id:p.id, fecha:p.fecha, monto:p.capital }));
+      const pagos = [];
+      pr.prestamos.forEach(p=> (p.pagos||[]).forEach(pg=> pagos.push({ id:uid(), fecha:pg.fecha, monto:pg.monto, nota:pg.nota||'' })));
+      return { id:pr.id, nombre:pr.nombre, telefono:pr.telefono||'', tasa, desembolsos, pagos, carteraId:null, frecuencia:'bisemanal' };
+    }
+    if(pr.carteraId===undefined) pr.carteraId = null;
+    if(pr.frecuencia===undefined) pr.frecuencia = 'bisemanal';
+    return pr;
+  });
+  data.config = data.config || {};
+  if(data.config.tasaDefecto===undefined) data.config.tasaDefecto = null;
+  if(data.config.diasGracia===undefined) data.config.diasGracia = 0;
+  data.clientesEliminados = data.clientesEliminados || [];
+  data.carteras = data.carteras || [];
+  return data;
+}
+
+function guardarDatos(){
+  localStorage.setItem('libro_prestamos_v1', JSON.stringify(DATA));
+}
+let DATA = cargarDatos();
+let detalleActualId = null;
+let ultimoInforme = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function hoy(){ return new Date().toISOString().slice(0,10); }
+function fmt(n){ return '$' + (Math.round(n*100)/100).toLocaleString('es-PA',{minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fechaLegible(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('es-PA',{day:'numeric',month:'short',year:'numeric'});
+}
+
+// El interés se suma desde el momento mismo del desembolso (cobro inmediato sobre ese
+// monto). El primer corte del calendario fijo que caiga a 14 días o menos de esa fecha
+// se omite (para no duplicar el cobro recién hecho). Del segundo corte en adelante, se
+// cobra normalmente cada 14 días — pero SIEMPRE sobre el capital pendiente en ese
+// momento, no sobre el monto original.
+const ANCLA_CORTE = new Date('2026-09-11T00:00:00');
+
+// Simula cronológicamente la cuenta de un cliente hasta una fecha dada: capital e
+// interés se llevan como saldos separados. Cada pago abona primero al interés
+// pendiente y, si sobra, el resto reduce el capital. Cada corte cobra interés sobre el
+// capital pendiente en ese instante (ya reducido por pagos anteriores, si los hubo).
+// Devuelve también el historial de movimientos (desembolsos, pagos e intereses) listo
+// para mostrar.
+function sumarDias(fechaISO, dias){
+  const d = new Date(fechaISO+'T00:00:00');
+  d.setDate(d.getDate() + Number(dias||0));
+  return d.toISOString().slice(0,10);
+}
+
+function ultimoDiaMes(anio, mesIndex0){
+  return new Date(anio, mesIndex0+1, 0).getDate();
+}
+
+// Primer corte (>= fechaISO) según la frecuencia del cliente.
+function primerCorte(frecuencia, fechaISO){
+  if(frecuencia==='quincenal'){
+    const d = new Date(fechaISO+'T00:00:00');
+    const anio=d.getFullYear(), mes=d.getMonth(), dia=d.getDate();
+    const ultimo = ultimoDiaMes(anio, mes);
+    const dCorte = dia<=15 ? 15 : ultimo;
+    return new Date(anio, mes, dCorte).toISOString().slice(0,10);
+  }
+  const fecha = new Date(fechaISO+'T00:00:00');
+  const diffFechaAncla = Math.round((fecha-ANCLA_CORTE)/DIA_MS);
+  const offset = diffFechaAncla<=0 ? 0 : Math.ceil(diffFechaAncla/PERIODO_DIAS)*PERIODO_DIAS;
+  return new Date(ANCLA_CORTE.getTime()+offset*DIA_MS).toISOString().slice(0,10);
+}
+
+// Corte siguiente al dado, según la frecuencia.
+function siguienteCorte(frecuencia, fechaCorteISO){
+  if(frecuencia==='quincenal'){
+    const d = new Date(fechaCorteISO+'T00:00:00');
+    const anio=d.getFullYear(), mes=d.getMonth(), dia=d.getDate();
+    if(dia===15) return new Date(anio, mes, ultimoDiaMes(anio,mes)).toISOString().slice(0,10);
+    return new Date(anio, mes+1, 15).toISOString().slice(0,10);
+  }
+  return sumarDias(fechaCorteISO, PERIODO_DIAS);
+}
+
+function simularCuenta(pr, hastaISO){
+  hastaISO = hastaISO || hoy();
+  const diasGracia = (DATA.config && DATA.config.diasGracia) || 0;
+  const frecuencia = pr.frecuencia || 'bisemanal';
+  const eventos = [];
+  (pr.desembolsos||[]).forEach(d=>{
+    if(d.fecha<=hastaISO) eventos.push({fecha:d.fecha, tipo:'desembolso', monto:d.monto, id:d.id, orden:0});
+  });
+  (pr.pagos||[]).forEach(pg=>{
+    if(pg.fecha<=hastaISO) eventos.push({fecha:pg.fecha, tipo:'pago', monto:pg.monto, nota:pg.nota||'', id:pg.id, orden:1});
+  });
+  // Por cada desembolso: el período de gracia se cuenta desde cada corte hacia adelante,
+  // empezando en el primer corte (el que ya se cubre con el interés inmediato). El
+  // segundo cobro cae en "primer corte + diasGracia"; de ahí en adelante cada cobro
+  // sucesivo se ancla al corte oficial siguiente, más los mismos días de gracia — tope
+  // de 13 días si es bisemanal, 14 si es quincenal. Si la gracia da 0, el resultado
+  // coincide con el primer corte mismo, que se omite (ya cubierto por el cobro inmediato).
+  const graciaMax = frecuencia==='quincenal' ? 14 : 13;
+  const diasGraciaEfectivo = Math.max(0, Math.min(diasGracia, graciaMax));
+  const fechasCorte = new Set();
+  (pr.desembolsos||[]).forEach(d=>{
+    if(d.fecha>hastaISO) return;
+    const primerCorteFecha = primerCorte(frecuencia, d.fecha);
+    let ancla = primerCorteFecha;
+    for(let k=1; k<1000; k++){
+      const fc = sumarDias(ancla, diasGraciaEfectivo);
+      if(fc>hastaISO) break;
+      if(fc!==primerCorteFecha) fechasCorte.add(fc);
+      ancla = siguienteCorte(frecuencia, ancla);
+    }
+  });
+  fechasCorte.forEach(fc=> eventos.push({fecha:fc, tipo:'corte', orden:2}));
+
+  eventos.sort((a,b)=> a.fecha<b.fecha?-1 : a.fecha>b.fecha?1 : a.orden-b.orden);
+
+  let capitalTotal=0, capitalPendiente=0, interesPendiente=0, totalPagado=0;
+  const historial=[];
+  eventos.forEach(ev=>{
+    if(ev.tipo==='desembolso'){
+      capitalTotal += ev.monto;
+      capitalPendiente += ev.monto;
+      historial.push({fecha:ev.fecha, tipo:'salida', label:'Préstamo entregado', monto:ev.monto, id:ev.id, origen:'desembolso'});
+      const cargo = ev.monto*(pr.tasa/100);
+      if(cargo>0){
+        interesPendiente += cargo;
+        historial.push({fecha:ev.fecha, tipo:'interes', label:'Interés generado', monto:cargo});
+      }
+    } else if(ev.tipo==='pago'){
+      totalPagado += ev.monto;
+      let restante = ev.monto;
+      const aInteres = Math.min(restante, interesPendiente);
+      interesPendiente -= aInteres;
+      restante -= aInteres;
+      const aCapital = Math.min(restante, capitalPendiente);
+      capitalPendiente -= aCapital;
+      let detalle;
+      if(aInteres>0 && aCapital>0) detalle = `abonado: interés ${fmt(aInteres)} + capital ${fmt(aCapital)}`;
+      else if(aInteres>0) detalle = `abonado a interés`;
+      else detalle = `abonado a capital`;
+      const label = (ev.nota ? ('Pago — '+ev.nota+' — ') : 'Pago — ') + detalle;
+      historial.push({fecha:ev.fecha, tipo:'entrada', label, monto:ev.monto, id:ev.id, origen:'pago'});
+    } else if(ev.tipo==='corte'){
+      if(capitalPendiente<=0) return;
+      const cargo = capitalPendiente*(pr.tasa/100);
+      if(cargo>0){
+        interesPendiente += cargo;
+        historial.push({fecha:ev.fecha, tipo:'interes', label:'Interés generado', monto:cargo});
+      }
+    }
+  });
+
+  const saldo = capitalPendiente + interesPendiente;
+  return { capitalTotal, capital:capitalPendiente, interes:interesPendiente, pagado:totalPagado, saldo, historial };
+}
+
+function renderResumenGlobal(){
+  let prestado=0, cobrado=0, pendiente=0;
+  DATA.prestatarios.forEach(pr=>{
+    const c = simularCuenta(pr);
+    prestado += c.capitalTotal;
+    cobrado += c.pagado;
+    pendiente += c.saldo;
+  });
+  document.getElementById('rTotalPrestado').textContent = fmt(prestado);
+  document.getElementById('rTotalCobrado').textContent = fmt(cobrado);
+  document.getElementById('rTotalPendiente').textContent = fmt(pendiente);
+}
+
+function filaClienteHtml(pr){
+  const c = simularCuenta(pr);
+  const saldado = c.saldo <= 0.005;
+  return `<div class="fila-prestatario" onclick="abrirDetalle('${pr.id}')">
+      <div class="fp-info">
+        <div class="nombre">${escapeHtml(pr.nombre)}</div>
+        <div class="meta">${(pr.desembolsos||[]).length} desembolso(s)</div>
+      </div>
+      <div class="fp-saldo">
+        <div class="monto num ${saldado?'saldado':'debe'}">${saldado?'Al día':fmt(c.saldo)}</div>
+        <div class="etiqueta">${saldado?'':'pendiente'}</div>
+      </div>
+    </div>`;
+}
+
+function renderLista(){
+  const cont = document.getElementById('lista');
+  if(DATA.prestatarios.length===0){
+    cont.innerHTML = '<div class="vacio">Todavía no has registrado ningún préstamo.<br>Toca "Nuevo prestatario" para empezar.</div>';
+    renderResumenGlobal();
+    return;
+  }
+  cont.innerHTML = DATA.prestatarios.map(filaClienteHtml).join('');
+  renderResumenGlobal();
+}
+
+function escapeHtml(s){
+  return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function abrir(id){ document.getElementById(id).classList.add('show'); }
+function cerrar(id){ document.getElementById(id).classList.remove('show'); }
+
+function opcionesCarteraHtml(labelSinCartera){
+  let opts = `<option value="">${labelSinCartera}</option>`;
+  (DATA.carteras||[]).forEach(c=> opts += `<option value="${c.id}">${escapeHtml(c.nombre)}</option>`);
+  return opts;
+}
+
+function abrirNuevoPrestatario(){
+  document.getElementById('npNombre').value='';
+  document.getElementById('npTelefono').value='';
+  document.getElementById('npCapital').value='';
+  document.getElementById('npTasa').value = (DATA.config && DATA.config.tasaDefecto) ? DATA.config.tasaDefecto : '';
+  document.getElementById('npFecha').value = hoy();
+  document.getElementById('npCartera').innerHTML = opcionesCarteraHtml('Sin cartera (por defecto)');
+  document.getElementById('npCartera').value = '';
+  document.getElementById('npFrecuencia').value = 'bisemanal';
+  abrir('ovPrestatario');
+}
+
+function guardarNuevoPrestatario(){
+  const nombre = document.getElementById('npNombre').value.trim();
+  const capital = parseFloat(document.getElementById('npCapital').value);
+  const tasa = parseFloat(document.getElementById('npTasa').value);
+  const fecha = document.getElementById('npFecha').value;
+  const carteraId = document.getElementById('npCartera').value || null;
+  const frecuencia = document.getElementById('npFrecuencia').value;
+  if(!nombre || !capital || !tasa || !fecha){
+    alert('Completa nombre, capital, tasa y fecha.');
+    return;
+  }
+  const pr = {
+    id: uid(),
+    nombre,
+    telefono: document.getElementById('npTelefono').value.trim(),
+    tasa,
+    carteraId,
+    frecuencia,
+    desembolsos: [{ id: uid(), fecha, monto: capital }],
+    pagos: []
+  };
+  DATA.prestatarios.push(pr);
+  guardarDatos();
+  cerrar('ovPrestatario');
+  renderLista();
+}
+
+function cambiarVista(v){
+  document.getElementById('vistaClientes').style.display = v==='clientes' ? '' : 'none';
+  document.getElementById('vistaCartera').style.display = v==='cartera' ? '' : 'none';
+  document.getElementById('tabBtnClientes').classList.toggle('active', v==='clientes');
+  document.getElementById('tabBtnCartera').classList.toggle('active', v==='cartera');
+  if(v==='cartera') refrescarVistaCartera();
+}
+
+function refrescarVistaCartera(){
+  const sel = document.getElementById('carteraSeleccionada');
+  const valorPrevio = sel.value;
+  sel.innerHTML = opcionesCarteraHtml('Sin cartera');
+  const existe = Array.from(sel.options).some(o=>o.value===valorPrevio);
+  sel.value = existe ? valorPrevio : (DATA.carteras[0] ? DATA.carteras[0].id : '');
+  renderClientesCartera();
+}
+
+function renderClientesCartera(){
+  const cont = document.getElementById('listaCartera');
+  const carteraId = document.getElementById('carteraSeleccionada').value;
+  const clientes = DATA.prestatarios.filter(pr => (pr.carteraId||'') === carteraId);
+  cont.innerHTML = clientes.length===0
+    ? '<div class="vacio">No hay clientes en esta cartera.</div>'
+    : clientes.map(filaClienteHtml).join('');
+}
+
+function abrirNuevaCartera(){
+  document.getElementById('ncNombre').value='';
+  abrir('ovNuevaCartera');
+}
+
+function guardarNuevaCartera(){
+  const nombre = document.getElementById('ncNombre').value.trim();
+  if(!nombre){ alert('Ponle un nombre a la cartera.'); return; }
+  DATA.carteras = DATA.carteras || [];
+  DATA.carteras.push({ id: uid(), nombre });
+  guardarDatos();
+  cerrar('ovNuevaCartera');
+  const sel = document.getElementById('carteraSeleccionada');
+  sel.innerHTML = opcionesCarteraHtml('Sin cartera');
+  sel.value = DATA.carteras[DATA.carteras.length-1].id;
+  renderClientesCartera();
+}
+
+function eliminarCarteraSeleccionada(){
+  const sel = document.getElementById('carteraSeleccionada');
+  const carteraId = sel.value;
+  if(!carteraId){
+    alert('"Sin cartera" no es una cartera real, no se puede eliminar.');
+    return;
+  }
+  const cartera = (DATA.carteras||[]).find(c=>c.id===carteraId);
+  if(!cartera) return;
+  const clientes = DATA.prestatarios.filter(pr=>pr.carteraId===carteraId);
+  const conSaldoPendiente = clientes.some(pr=> Math.abs(simularCuenta(pr).saldo) > 0.005);
+  if(conSaldoPendiente){
+    alert(`No puedes eliminar "${cartera.nombre}": tiene clientes con saldo pendiente. Salda esas cuentas primero.`);
+    return;
+  }
+  const mensaje = clientes.length===0
+    ? `¿Eliminar la cartera "${cartera.nombre}"?`
+    : `¿Eliminar la cartera "${cartera.nombre}"? Sus ${clientes.length} cliente(s) (ya saldados) pasarán a "Sin cartera".`;
+  if(!confirm(mensaje)) return;
+  clientes.forEach(pr=> pr.carteraId = null);
+  DATA.carteras = DATA.carteras.filter(c=>c.id!==carteraId);
+  guardarDatos();
+  refrescarVistaCartera();
+}
+
+function abrirDetalle(id){
+  detalleActualId = id;
+  renderDetalle();
+  abrir('ovDetalle');
+}
+
+function renderDetalle(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr) return;
+  const c = simularCuenta(pr);
+  const saldado = Math.abs(c.saldo) <= 0.005;
+  const frecLabel = pr.frecuencia==='quincenal' ? 'Quincenal (15 y 30)' : 'Bisemanal (14 días)';
+  let html = `<button class="cerrar" onclick="cerrar('ovDetalle')">×</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding-right:28px;">
+      <h2 style="margin:0;">${escapeHtml(pr.nombre)}</h2>
+      <button class="btn-secondary" style="padding:6px 12px;font-size:12.5px;flex:0 0 auto;" onclick="abrirEditarCliente()">Editar</button>
+    </div>
+    <div class="prestamo-card">
+      <div class="fila"><span class="k">Capital total prestado</span><span class="v num">${fmt(c.capitalTotal)}</span></div>
+      <div class="fila"><span class="k">Capital pendiente</span><span class="v num">${fmt(c.capital)}</span></div>
+      <div class="fila"><span class="k">Interés por período</span><span class="v num">${pr.tasa}%</span></div>
+      <div class="fila"><span class="k">Frecuencia de pago</span><span class="v num">${frecLabel}</span></div>
+      <div class="fila"><span class="k">Interés pendiente</span><span class="v num">${fmt(c.interes)}</span></div>
+      <div class="fila"><span class="k">Total pagado</span><span class="v num">${fmt(c.pagado)}</span></div>
+      <div class="saldo-line"><span>Saldo total</span><span class="num">${fmt(c.saldo)}</span></div>
+      <div class="btns">
+        <button class="btn-mini" onclick="abrirPago()">Registrar pago</button>
+        <button class="btn-mini alt" onclick="abrirMensajeWA()">Mensaje WhatsApp</button>
+      </div>
+    </div>
+    <div class="acciones" style="margin-top:0;margin-bottom:6px;">
+      <button class="btn-secondary" style="flex:1" onclick="abrirNuevoDesembolso()">+ Nuevo desembolso</button>
+    </div>
+    <h3>Historial de movimientos</h3><div>`;
+
+  const movs = c.historial.slice().sort((a,b)=> a.fecha < b.fecha ? 1 : -1);
+  if(movs.length===0){
+    html += `<div class="vacio" style="padding:20px;">Sin movimientos aún.</div>`;
+  } else {
+    movs.forEach(m=>{
+      const signo = m.tipo==='entrada' ? '-' : '+';
+      const editar = m.origen ? `<br><a href="javascript:void(0)" onclick="abrirEditarMovimiento('${m.origen}','${m.id}')" style="font-size:11px;color:var(--ink-soft);text-decoration:underline;">editar</a>` : '';
+      html += `<div class="movimiento">
+        <span>${m.label}<br><span class="fecha">${fechaLegible(m.fecha)}</span></span>
+        <span style="text-align:right;">
+          <span class="num tipo-${m.tipo}">${signo}${fmt(m.monto)}</span>${editar}
+        </span>
+      </div>`;
+    });
+  }
+  html += `</div>
+    <div class="acciones" style="margin-top:18px;">
+      <button class="btn-secondary" style="flex:1;color:var(--red);border-color:var(--red);" onclick="eliminarCliente()">Eliminar cliente</button>
+    </div>
+    ${saldado ? '' : '<div style="font-size:11.5px;color:var(--ink-soft);text-align:center;margin-top:4px;">Solo se puede eliminar cuando el saldo esté en $0.00</div>'}`;
+  document.getElementById('hojaDetalle').innerHTML = html;
+}
+
+function abrirEditarCliente(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr) return;
+  document.getElementById('ecNombre').value = pr.nombre;
+  document.getElementById('ecTelefono').value = pr.telefono || '';
+  document.getElementById('ecCartera').innerHTML = opcionesCarteraHtml('Sin cartera');
+  document.getElementById('ecCartera').value = pr.carteraId || '';
+  document.getElementById('ecFrecuencia').value = pr.frecuencia || 'bisemanal';
+  document.getElementById('ecTasa').value = pr.tasa;
+  abrir('ovEditarCliente');
+}
+
+function guardarEdicionCliente(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr) return;
+  const nombre = document.getElementById('ecNombre').value.trim();
+  const tasa = parseFloat(document.getElementById('ecTasa').value);
+  if(!nombre || !tasa){
+    alert('Completa nombre y tasa.');
+    return;
+  }
+  pr.nombre = nombre;
+  pr.telefono = document.getElementById('ecTelefono').value.trim();
+  pr.carteraId = document.getElementById('ecCartera').value || null;
+  pr.frecuencia = document.getElementById('ecFrecuencia').value;
+  pr.tasa = tasa;
+  guardarDatos();
+  cerrar('ovEditarCliente');
+  renderDetalle();
+  renderLista();
+}
+
+let movimientoEditando = null;
+
+function abrirEditarMovimiento(origen, movId){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr) return;
+  const lista = origen==='desembolso' ? pr.desembolsos : pr.pagos;
+  const mov = (lista||[]).find(x=>x.id===movId);
+  if(!mov) return;
+  movimientoEditando = { origen, movId };
+  document.getElementById('emTitulo').textContent = origen==='desembolso' ? 'Editar desembolso' : 'Editar pago';
+  document.getElementById('emMonto').value = mov.monto;
+  document.getElementById('emFecha').value = mov.fecha;
+  document.getElementById('emNotaWrap').style.display = origen==='pago' ? '' : 'none';
+  document.getElementById('emNota').value = origen==='pago' ? (mov.nota||'') : '';
+  abrir('ovEditarMovimiento');
+}
+
+function guardarEdicionMovimiento(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr || !movimientoEditando) return;
+  const { origen, movId } = movimientoEditando;
+  const lista = origen==='desembolso' ? pr.desembolsos : pr.pagos;
+  const mov = (lista||[]).find(x=>x.id===movId);
+  if(!mov) return;
+  const monto = parseFloat(document.getElementById('emMonto').value);
+  const fecha = document.getElementById('emFecha').value;
+  if(!monto || !fecha){ alert('Indica monto y fecha.'); return; }
+  mov.monto = monto;
+  mov.fecha = fecha;
+  if(origen==='pago') mov.nota = document.getElementById('emNota').value.trim();
+  guardarDatos();
+  cerrar('ovEditarMovimiento');
+  renderDetalle();
+  renderLista();
+}
+
+function eliminarMovimiento(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr || !movimientoEditando) return;
+  const { origen, movId } = movimientoEditando;
+  if(!confirm('¿Eliminar este movimiento? Esta acción no se puede deshacer.')) return;
+  if(origen==='desembolso') pr.desembolsos = (pr.desembolsos||[]).filter(x=>x.id!==movId);
+  else pr.pagos = (pr.pagos||[]).filter(x=>x.id!==movId);
+  guardarDatos();
+  cerrar('ovEditarMovimiento');
+  renderDetalle();
+  renderLista();
+}
+
+function eliminarCliente(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  if(!pr) return;
+  const c = simularCuenta(pr);
+  if(Math.abs(c.saldo) > 0.005){
+    alert(`No puedes eliminar a ${pr.nombre}: todavía tiene un saldo pendiente de ${fmt(c.saldo)}. Salda la cuenta primero.`);
+    return;
+  }
+  if(!confirm(`¿Eliminar a ${pr.nombre} y todo su historial? Esta acción no se puede deshacer.`)) return;
+  DATA.clientesEliminados = DATA.clientesEliminados || [];
+  DATA.clientesEliminados.push({
+    id: pr.id,
+    nombre: pr.nombre,
+    telefono: pr.telefono || '',
+    tasa: pr.tasa,
+    fechaEliminacion: hoy(),
+    capitalTotal: c.capitalTotal,
+    totalPagado: c.pagado,
+    historial: c.historial
+  });
+  DATA.prestatarios = DATA.prestatarios.filter(p=>p.id!==detalleActualId);
+  guardarDatos();
+  cerrar('ovDetalle');
+  renderLista();
+}
+
+function abrirConfiguracion(){
+  document.getElementById('cfgTasa').value = (DATA.config && DATA.config.tasaDefecto) ? DATA.config.tasaDefecto : '';
+  document.getElementById('cfgGracia').value = (DATA.config && DATA.config.diasGracia) ? DATA.config.diasGracia : 0;
+  renderEliminados();
+  abrir('ovConfig');
+}
+
+function guardarConfiguracion(){
+  const tasa = parseFloat(document.getElementById('cfgTasa').value);
+  let gracia = parseInt(document.getElementById('cfgGracia').value, 10);
+  if(isNaN(gracia)) gracia = 0;
+  if(gracia<0 || gracia>14){
+    alert('El período de gracia debe estar entre 0 y 14 días.');
+    return;
+  }
+  DATA.config = {
+    tasaDefecto: isNaN(tasa) ? null : tasa,
+    diasGracia: gracia
+  };
+  guardarDatos();
+  cerrar('ovConfig');
+}
+
+function renderEliminados(){
+  const cont = document.getElementById('cfgEliminados');
+  const lista = DATA.clientesEliminados || [];
+  if(lista.length===0){
+    cont.innerHTML = '<div class="vacio" style="padding:14px 0;">Todavía no has eliminado ningún cliente.</div>';
+    return;
+  }
+  cont.innerHTML = lista.slice().reverse().map(cl=>
+    `<div class="movimiento">
+      <span>${escapeHtml(cl.nombre)}<br><span class="fecha">Eliminado el ${fechaLegible(cl.fechaEliminacion)}</span></span>
+      <span class="num">${fmt(cl.capitalTotal)}</span>
+    </div>`
+  ).join('');
+}
+
+function descargarClientesEliminados(){
+  const lista = DATA.clientesEliminados || [];
+  if(lista.length===0){ alert('No hay clientes eliminados todavía.'); return; }
+  const filas = [['Cliente','Teléfono','Fecha de eliminación','Capital total prestado','Total pagado','Fecha movimiento','Tipo','Descripción','Monto']];
+  lista.forEach(cl=>{
+    (cl.historial||[]).forEach(m=>{
+      filas.push([cl.nombre, cl.telefono, cl.fechaEliminacion, cl.capitalTotal.toFixed(2), cl.totalPagado.toFixed(2), m.fecha, m.tipo, m.label, m.monto.toFixed(2)]);
+    });
+    if(!cl.historial || cl.historial.length===0){
+      filas.push([cl.nombre, cl.telefono, cl.fechaEliminacion, cl.capitalTotal.toFixed(2), cl.totalPagado.toFixed(2), '', '', '', '']);
+    }
+  });
+  const csv = filas.map(f=> f.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'clientes-eliminados.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function abrirNuevoDesembolso(){
+  document.getElementById('qpCapital').value='';
+  document.getElementById('qpFecha').value = hoy();
+  abrir('ovNuevoPrestamo');
+}
+function guardarNuevoDesembolso(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  const capital = parseFloat(document.getElementById('qpCapital').value);
+  const fecha = document.getElementById('qpFecha').value;
+  if(!capital || !fecha){ alert('Completa monto y fecha.'); return; }
+  pr.desembolsos = pr.desembolsos || [];
+  pr.desembolsos.push({ id: uid(), fecha, monto: capital });
+  guardarDatos();
+  cerrar('ovNuevoPrestamo');
+  renderDetalle();
+  renderLista();
+}
+
+function abrirPago(){
+  document.getElementById('pgMonto').value='';
+  document.getElementById('pgFecha').value = hoy();
+  document.getElementById('pgNota').value='';
+  abrir('ovPago');
+}
+function guardarPago(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  const monto = parseFloat(document.getElementById('pgMonto').value);
+  const fecha = document.getElementById('pgFecha').value;
+  const nota = document.getElementById('pgNota').value.trim();
+  if(!monto || !fecha){ alert('Indica monto y fecha.'); return; }
+  pr.pagos = pr.pagos || [];
+  pr.pagos.push({ id: uid(), monto, fecha, nota });
+  guardarDatos();
+  cerrar('ovPago');
+  renderDetalle();
+  renderLista();
+}
+
+function abrirMensajeWA(){
+  const pr = DATA.prestatarios.find(p=>p.id===detalleActualId);
+  const c = simularCuenta(pr);
+  const cortes = c.historial.filter(m=>m.tipo==='interes').length;
+  const movs = c.historial.slice().sort((a,b)=> a.fecha < b.fecha ? -1 : 1);
+  const historial = movs.map(m=>`${fechaLegible(m.fecha)} — ${m.label}: ${fmt(m.monto)}`).join('\n');
+
+  const texto =
+`Estado del préstamo
+
+Capital pendiente: ${fmt(c.capital)}
+Cortes de interés aplicados: ${cortes}
+
+Historial:
+${historial}
+
+Interés pendiente: ${fmt(c.interes)}
+Total pagado: ${fmt(c.pagado)}
+Saldo pendiente: ${fmt(c.saldo)}
+
+Fecha de corte: ${fechaLegible(hoy())}`;
+  document.getElementById('waTexto').value = texto;
+  document.getElementById('waCopiado').textContent='';
+  abrir('ovWA');
+}
+function copiarWA(){
+  const ta = document.getElementById('waTexto');
+  ta.select();
+  try{
+    navigator.clipboard.writeText(ta.value).then(()=>{
+      document.getElementById('waCopiado').textContent = 'Copiado. Ya puedes pegarlo en WhatsApp.';
+    }).catch(()=>{ document.execCommand('copy'); document.getElementById('waCopiado').textContent = 'Copiado.'; });
+  }catch(e){
+    document.execCommand('copy');
+    document.getElementById('waCopiado').textContent = 'Copiado.';
+  }
+}
+
+function abrirInforme(){
+  const d = new Date();
+  document.getElementById('ifMes').value = d.toISOString().slice(0,7);
+  document.getElementById('ifResultado').innerHTML='';
+  abrir('ovInforme');
+}
+function generarInforme(){
+  const mes = document.getElementById('ifMes').value;
+  if(!mes){ alert('Elige un mes.'); return; }
+  const [anio, mesNum] = mes.split('-').map(Number);
+  const inicioMes = `${mes}-01`;
+  const finMesDate = new Date(anio, mesNum, 0);
+  const finMes = finMesDate.toISOString().slice(0,10);
+
+  let prestadoMes=0, cobradoMes=0, interesMes=0;
+  let filas='';
+  const detalle=[];
+
+  DATA.prestatarios.forEach(pr=>{
+    let prPrestado=0, prCobrado=0;
+    (pr.desembolsos||[]).forEach(d=>{
+      if(d.fecha >= inicioMes && d.fecha <= finMes) prPrestado += d.monto;
+    });
+    (pr.pagos||[]).forEach(pg=>{
+      if(pg.fecha >= inicioMes && pg.fecha <= finMes) prCobrado += pg.monto;
+    });
+    const prInteres = simularCuenta(pr, finMes).historial
+      .filter(m=> m.tipo==='interes' && m.fecha>=inicioMes && m.fecha<=finMes)
+      .reduce((s,m)=>s+m.monto, 0);
+
+    if(prPrestado>0 || prCobrado>0 || prInteres>0){
+      filas += `<div class="informe-linea"><span>${escapeHtml(pr.nombre)}</span><span class="num">Prest ${fmt(prPrestado)} · Cobr ${fmt(prCobrado)} · Int ${fmt(prInteres)}</span></div>`;
+      detalle.push({ nombre: pr.nombre, prestado: prPrestado, cobrado: prCobrado, interes: prInteres });
+    }
+    prestadoMes+=prPrestado; cobradoMes+=prCobrado; interesMes+=prInteres;
+  });
+
+  const nombreMes = finMesDate.toLocaleDateString('es-PA',{month:'long', year:'numeric'});
+  ultimoInforme = { mes, nombreMes, detalle, totales:{prestado:prestadoMes, cobrado:cobradoMes, interes:interesMes} };
+
+  document.getElementById('ifResultado').innerHTML = `
+    <h3 style="margin-top:0;">Detalle por prestatario</h3>
+    ${filas || '<div class="vacio" style="padding:12px 0;">Sin movimientos en '+nombreMes+'.</div>'}
+    <div class="informe-total"><span>Total prestado</span><span class="num">${fmt(prestadoMes)}</span></div>
+    <div class="informe-linea"><span>Total cobrado</span><span class="num">${fmt(cobradoMes)}</span></div>
+    <div class="informe-linea"><span>Interés generado en el mes</span><span class="num">${fmt(interesMes)}</span></div>
+    <div class="acciones">
+      <button class="btn-secondary" style="flex:1" onclick="copiarInforme()">Copiar</button>
+      <button class="btn-secondary" style="flex:1" onclick="descargarInformeCSV()">Excel (CSV)</button>
+    </div>
+    <div class="acciones">
+      <button class="btn-primary" onclick="descargarInformePDF()">Descargar PDF</button>
+    </div>`;
+}
+function copiarInforme(){
+  if(!ultimoInforme) return;
+  const texto = `Informe de préstamos — ${ultimoInforme.nombreMes}\n\nTotal prestado: ${fmt(ultimoInforme.totales.prestado)}\nTotal cobrado: ${fmt(ultimoInforme.totales.cobrado)}\nInterés generado: ${fmt(ultimoInforme.totales.interes)}`;
+  navigator.clipboard.writeText(texto).then(()=>alert('Informe copiado.')).catch(()=>alert('No se pudo copiar automáticamente. Copia el texto manualmente.'));
+}
+
+function descargarInformeCSV(){
+  if(!ultimoInforme) return;
+  const filas = [['Cliente','Prestado','Cobrado','Interés generado']];
+  ultimoInforme.detalle.forEach(d=> filas.push([d.nombre, d.prestado.toFixed(2), d.cobrado.toFixed(2), d.interes.toFixed(2)]));
+  filas.push(['Total', ultimoInforme.totales.prestado.toFixed(2), ultimoInforme.totales.cobrado.toFixed(2), ultimoInforme.totales.interes.toFixed(2)]);
+  const csv = filas.map(f=> f.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `informe-prestamos-${ultimoInforme.mes}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function descargarInformePDF(){
+  if(!ultimoInforme) return;
+  const filasHtml = ultimoInforme.detalle.map(d=>
+    `<tr><td>${escapeHtml(d.nombre)}</td><td>${fmt(d.prestado)}</td><td>${fmt(d.cobrado)}</td><td>${fmt(d.interes)}</td></tr>`
+  ).join('');
+  document.getElementById('areaImprimir').innerHTML = `
+    <h2>Informe de préstamos — ${ultimoInforme.nombreMes}</h2>
+    <table>
+      <thead><tr><th>Cliente</th><th>Prestado</th><th>Cobrado</th><th>Interés generado</th></tr></thead>
+      <tbody>${filasHtml}</tbody>
+      <tfoot><tr><td>Total</td><td>${fmt(ultimoInforme.totales.prestado)}</td><td>${fmt(ultimoInforme.totales.cobrado)}</td><td>${fmt(ultimoInforme.totales.interes)}</td></tr></tfoot>
+    </table>`;
+  window.print();
+}
+
+renderLista();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
