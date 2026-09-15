@@ -513,6 +513,31 @@
       <button class="btn-primary" onclick="guardarConfiguracion()">Guardar configuración</button>
     </div>
 
+    <h3>Respaldo completo</h3>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px;">Descarga un archivo con TODOS tus datos (clientes, préstamos, pagos, carteras y configuración) para guardarlo en un lugar seguro — por ejemplo Google Drive, o envíatelo por correo o WhatsApp. Si cambias de teléfono o necesitas recuperar información, usa "Restaurar desde respaldo".</p>
+    <div class="acciones">
+      <button class="btn-secondary" style="flex:1" onclick="descargarRespaldoCompleto()">Descargar respaldo (JSON)</button>
+    </div>
+    <div class="acciones">
+      <button class="btn-secondary" style="flex:1" onclick="document.getElementById('inputRespaldo').click()">Restaurar desde respaldo</button>
+    </div>
+    <input type="file" id="inputRespaldo" accept="application/json" style="display:none;" onchange="restaurarRespaldo(event)">
+
+    <label style="display:flex;align-items:center;gap:8px;margin:16px 0 0;">
+      <input type="checkbox" id="cfgRespaldoInterno" style="width:auto;">
+      <span style="font-size:12.5px;color:var(--ink);">Respaldo interno diario (guarda una copia dentro de la app, sin crear archivos — últimos 7 días)</span>
+    </label>
+
+    <label style="margin-top:14px;">Además, descargar un archivo automáticamente</label>
+    <select id="cfgFrecuenciaArchivo">
+      <option value="nunca">Nunca (solo con el botón manual)</option>
+      <option value="semanal">Semanal</option>
+      <option value="diario">Diario</option>
+    </select>
+    <p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0;">Se dispara solo al abrir la app (no a una hora exacta). "Semanal" reduce mucho la acumulación de archivos en Descargas frente a "Diario".</p>
+
+    <div id="cfgRespaldosInternos" style="margin-top:14px;"></div>
+
     <h3>Clientes eliminados (histórico)</h3>
     <div id="cfgEliminados"></div>
     <div class="acciones">
@@ -552,6 +577,9 @@ function migrarDatos(data){
   data.config = data.config || {};
   if(data.config.tasaDefecto===undefined) data.config.tasaDefecto = null;
   if(data.config.diasGracia===undefined) data.config.diasGracia = 0;
+  if(data.config.respaldoAutomatico===undefined) data.config.respaldoAutomatico = true;
+  if(data.config.frecuenciaArchivoAuto===undefined) data.config.frecuenciaArchivoAuto = 'semanal';
+  data.respaldosInternos = data.respaldosInternos || [];
   data.clientesEliminados = data.clientesEliminados || [];
   data.carteras = data.carteras || [];
   return data;
@@ -680,7 +708,7 @@ function simularCuenta(pr, hastaISO){
       if(aInteres>0 && aCapital>0) detalle = `abonado: interés ${fmt(aInteres)} + capital ${fmt(aCapital)}`;
       else if(aInteres>0) detalle = `abonado a interés`;
       else detalle = `abonado a capital`;
-      const label = (ev.nota ? ('Pago — '+ev.nota+' — ') : 'Pago — ') + detalle;
+      const label = (ev.nota ? ('Pago — '+escapeHtml(ev.nota)+' — ') : 'Pago — ') + detalle;
       historial.push({fecha:ev.fecha, tipo:'entrada', label, monto:ev.monto, id:ev.id, origen:'pago'});
     } else if(ev.tipo==='corte'){
       if(capitalPendiente<=0) return;
@@ -1024,6 +1052,9 @@ function eliminarCliente(){
 function abrirConfiguracion(){
   document.getElementById('cfgTasa').value = (DATA.config && DATA.config.tasaDefecto) ? DATA.config.tasaDefecto : '';
   document.getElementById('cfgGracia').value = (DATA.config && DATA.config.diasGracia) ? DATA.config.diasGracia : 0;
+  document.getElementById('cfgRespaldoInterno').checked = !(DATA.config && DATA.config.respaldoAutomatico===false);
+  document.getElementById('cfgFrecuenciaArchivo').value = (DATA.config && DATA.config.frecuenciaArchivoAuto) || 'semanal';
+  renderRespaldosInternos();
   renderEliminados();
   abrir('ovConfig');
 }
@@ -1036,10 +1067,12 @@ function guardarConfiguracion(){
     alert('El período de gracia debe estar entre 0 y 14 días.');
     return;
   }
-  DATA.config = {
+  DATA.config = Object.assign({}, DATA.config, {
     tasaDefecto: isNaN(tasa) ? null : tasa,
-    diasGracia: gracia
-  };
+    diasGracia: gracia,
+    respaldoAutomatico: document.getElementById('cfgRespaldoInterno').checked,
+    frecuenciaArchivoAuto: document.getElementById('cfgFrecuenciaArchivo').value
+  });
   guardarDatos();
   cerrar('ovConfig');
 }
@@ -1081,6 +1114,130 @@ function descargarClientesEliminados(){
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+function descargarRespaldoCompleto(){
+  const json = JSON.stringify(DATA, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `respaldo-flexicred-${hoy()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Respaldo automático: como una página no puede ejecutarse sola a una hora fija,
+// esto se dispara la primera vez que se abre la app cada día (no exactamente a
+// medianoche). Descarga un archivo nuevo con la fecha en el nombre, sin tocar el
+// botón de respaldo manual.
+// Respaldo interno: guarda una copia completa dentro del propio almacenamiento del
+// navegador, sin crear ningún archivo. Se queda solo con los últimos 7 días (rota los
+// más viejos), así sirve como "deshacer" ante un error sin acumular nada.
+function tomarSnapshotInterno(){
+  const copia = JSON.parse(JSON.stringify(DATA));
+  delete copia.respaldosInternos;
+  DATA.respaldosInternos = DATA.respaldosInternos || [];
+  DATA.respaldosInternos.push({ fecha: hoy(), datos: copia });
+  if(DATA.respaldosInternos.length > 7) DATA.respaldosInternos = DATA.respaldosInternos.slice(-7);
+}
+
+function renderRespaldosInternos(){
+  const cont = document.getElementById('cfgRespaldosInternos');
+  const lista = DATA.respaldosInternos || [];
+  if(lista.length===0){
+    cont.innerHTML = '';
+    return;
+  }
+  let html = '<h3>Respaldos internos (últimos días)</h3>';
+  lista.slice().reverse().forEach(r=>{
+    html += `<div class="movimiento">
+      <span>${fechaLegible(r.fecha)}</span>
+      <a href="javascript:void(0)" onclick="restaurarSnapshotInterno('${r.fecha}')" style="font-size:12px;color:var(--cover);text-decoration:underline;">Restaurar</a>
+    </div>`;
+  });
+  cont.innerHTML = html;
+}
+
+function restaurarSnapshotInterno(fecha){
+  const entry = (DATA.respaldosInternos||[]).find(r=>r.fecha===fecha);
+  if(!entry) return;
+  if(!confirm(`¿Restaurar el respaldo interno del ${fechaLegible(fecha)}? Esto reemplaza los datos actuales.`)) return;
+  const snapshotsPrevios = DATA.respaldosInternos;
+  DATA = migrarDatos(JSON.parse(JSON.stringify(entry.datos)));
+  DATA.respaldosInternos = snapshotsPrevios;
+  guardarDatos();
+  renderLista();
+  cerrar('ovConfig');
+  alert('Respaldo interno restaurado.');
+}
+
+// Al abrir la app cada día: (1) guarda el snapshot interno si está activado, y
+// (2) descarga un archivo real solo con la frecuencia que elegiste (nunca/semanal/diario)
+// — así evitas que se acumulen archivos si no los necesitas tan seguido.
+function verificarRespaldoAutomatico(){
+  DATA.config = DATA.config || {};
+  if(!DATA.prestatarios || DATA.prestatarios.length===0) return;
+  const hoyStr = hoy();
+
+  if(DATA.config.respaldoAutomatico !== false && DATA.config.ultimoRespaldoInterno !== hoyStr){
+    tomarSnapshotInterno();
+    DATA.config.ultimoRespaldoInterno = hoyStr;
+    guardarDatos();
+  }
+
+  const freq = DATA.config.frecuenciaArchivoAuto || 'semanal';
+  if(freq === 'nunca') return;
+  const ultimo = DATA.config.ultimoArchivoAuto;
+  let debeDescargar = !ultimo;
+  if(!debeDescargar && freq==='diario') debeDescargar = ultimo !== hoyStr;
+  if(!debeDescargar && freq==='semanal'){
+    const dias = Math.round((new Date(hoyStr+'T00:00:00') - new Date(ultimo+'T00:00:00'))/DIA_MS);
+    debeDescargar = dias >= 7;
+  }
+  if(!debeDescargar) return;
+
+  const json = JSON.stringify(DATA, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `respaldo-automatico-flexicred-${hoyStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  DATA.config.ultimoArchivoAuto = hoyStr;
+  guardarDatos();
+}
+
+function restaurarRespaldo(event){
+  const file = event.target.files[0];
+  event.target.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    let data;
+    try{
+      data = JSON.parse(e.target.result);
+    }catch(err){
+      alert('No se pudo leer el archivo. Asegúrate de que sea un respaldo válido de FlexiCred (.json).');
+      return;
+    }
+    if(!data || !Array.isArray(data.prestatarios)){
+      alert('El archivo no parece un respaldo válido de FlexiCred.');
+      return;
+    }
+    if(!confirm('Esto reemplaza TODOS los datos actuales (clientes, préstamos, pagos, configuración) con los del respaldo. Esta acción no se puede deshacer. ¿Continuar?')) return;
+    DATA = migrarDatos(data);
+    guardarDatos();
+    renderLista();
+    cerrar('ovConfig');
+    alert('Respaldo restaurado correctamente.');
+  };
+  reader.readAsText(file);
 }
 
 function abrirNuevoDesembolso(){
@@ -1252,6 +1409,7 @@ function descargarInformePDF(){
 }
 
 renderLista();
+verificarRespaldoAutomatico();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
