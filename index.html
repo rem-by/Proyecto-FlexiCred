@@ -325,6 +325,20 @@
       <button class="btn-secondary" onclick="abrirInforme()">Informe</button>
       <button class="btn-secondary" style="flex:0 0 46px;padding:11px 0;font-size:17px;" onclick="abrirConfiguracion()">⚙</button>
     </div>
+    <div style="padding:0 16px 10px;">
+      <input id="buscadorClientes" type="text" placeholder="Buscar cliente por nombre..." oninput="renderLista()">
+      <div class="fila-2" style="margin-top:8px;">
+        <div><select id="filtroEstado" onchange="renderLista()">
+          <option value="todos">Todos</option>
+          <option value="pendiente">Con saldo pendiente</option>
+          <option value="aldia">Al día</option>
+        </select></div>
+        <div><select id="ordenClientes" onchange="renderLista()">
+          <option value="alfabetico">Nombre (A-Z)</option>
+          <option value="saldo">Saldo (mayor a menor)</option>
+        </select></div>
+      </div>
+    </div>
     <div class="lista" id="lista"></div>
   </div>
 
@@ -752,6 +766,28 @@ function filaClienteHtml(pr){
     </div>`;
 }
 
+// Filtra por nombre (si hay texto de búsqueda), por estado de saldo, y ordena —
+// reutilizado tanto en la lista general de Clientes como en la vista de Cartera.
+function filtrarYOrdenarClientes(lista, searchTerm, filtroEstado, orden){
+  let resultado = lista.slice();
+  if(searchTerm && searchTerm.trim()){
+    const term = searchTerm.trim().toLowerCase();
+    resultado = resultado.filter(pr => (pr.nombre||'').toLowerCase().includes(term));
+  }
+  if(filtroEstado && filtroEstado!=='todos'){
+    resultado = resultado.filter(pr=>{
+      const saldado = simularCuenta(pr).saldo <= 0.005;
+      return filtroEstado==='pendiente' ? !saldado : saldado;
+    });
+  }
+  if(orden==='saldo'){
+    resultado.sort((a,b)=> simularCuenta(b).saldo - simularCuenta(a).saldo);
+  } else {
+    resultado.sort((a,b)=> (a.nombre||'').localeCompare(b.nombre||'', 'es', {sensitivity:'base'}));
+  }
+  return resultado;
+}
+
 function renderLista(){
   const cont = document.getElementById('lista');
   if(DATA.prestatarios.length===0){
@@ -759,7 +795,13 @@ function renderLista(){
     renderResumenGlobal();
     return;
   }
-  cont.innerHTML = DATA.prestatarios.map(filaClienteHtml).join('');
+  const searchTerm = document.getElementById('buscadorClientes') ? document.getElementById('buscadorClientes').value : '';
+  const filtroEstado = document.getElementById('filtroEstado') ? document.getElementById('filtroEstado').value : 'todos';
+  const orden = document.getElementById('ordenClientes') ? document.getElementById('ordenClientes').value : 'alfabetico';
+  const filtrados = filtrarYOrdenarClientes(DATA.prestatarios, searchTerm, filtroEstado, orden);
+  cont.innerHTML = filtrados.length===0
+    ? '<div class="vacio">No se encontró ningún cliente con ese criterio.</div>'
+    : filtrados.map(filaClienteHtml).join('');
   renderResumenGlobal();
 }
 
@@ -767,7 +809,13 @@ function escapeHtml(s){
   return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
-function abrir(id){ document.getElementById(id).classList.add('show'); }
+let zIndexModal = 50;
+function abrir(id){
+  const el = document.getElementById(id);
+  zIndexModal += 1;
+  el.style.zIndex = zIndexModal;
+  el.classList.add('show');
+}
 function cerrar(id){ document.getElementById(id).classList.remove('show'); }
 
 function opcionesCarteraHtml(labelSinCartera){
@@ -835,7 +883,9 @@ function refrescarVistaCartera(){
 function renderClientesCartera(){
   const cont = document.getElementById('listaCartera');
   const carteraId = document.getElementById('carteraSeleccionada').value;
-  const clientes = DATA.prestatarios.filter(pr => (pr.carteraId||'') === carteraId);
+  const clientes = filtrarYOrdenarClientes(
+    DATA.prestatarios.filter(pr => (pr.carteraId||'') === carteraId), '', 'todos', 'alfabetico'
+  );
   cont.innerHTML = clientes.length===0
     ? '<div class="vacio">No hay clientes en esta cartera.</div>'
     : clientes.map(filaClienteHtml).join('');
