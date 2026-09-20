@@ -726,7 +726,18 @@ function simularCuenta(pr, hastaISO){
       historial.push({fecha:ev.fecha, tipo:'entrada', label, monto:ev.monto, id:ev.id, origen:'pago'});
     } else if(ev.tipo==='corte'){
       if(capitalPendiente<=0) return;
-      const cargo = capitalPendiente*(pr.tasa/100);
+      // Un desembolso con menos de 13 días de antigüedad respecto a este corte ya
+      // recibió su propio cobro inmediato al desembolsar — incluirlo aquí sería
+      // cobrarle interés dos veces por el mismo período. Se resta de la base.
+      const fechaEvento = new Date(ev.fecha+'T00:00:00');
+      let capitalMuyReciente = 0;
+      (pr.desembolsos||[]).forEach(d=>{
+        if(d.fecha>ev.fecha) return;
+        const diasTranscurridos = Math.round((fechaEvento - new Date(d.fecha+'T00:00:00'))/DIA_MS);
+        if(diasTranscurridos < 13) capitalMuyReciente += d.monto;
+      });
+      const baseCalculo = Math.max(0, capitalPendiente - capitalMuyReciente);
+      const cargo = baseCalculo*(pr.tasa/100);
       if(cargo>0){
         interesPendiente += cargo;
         historial.push({fecha:ev.fecha, tipo:'interes', label:'Interés generado', monto:cargo});
