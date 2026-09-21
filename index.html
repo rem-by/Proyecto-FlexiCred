@@ -648,7 +648,11 @@ function primerCorte(frecuencia, fechaISO){
   }
   const fecha = new Date(fechaISO+'T00:00:00');
   const diffFechaAncla = Math.round((fecha-ANCLA_CORTE)/DIA_MS);
-  const offset = diffFechaAncla<=0 ? 0 : Math.ceil(diffFechaAncla/PERIODO_DIAS)*PERIODO_DIAS;
+  // Math.ceil funciona igual de bien para fechas antes o después del ancla: siempre da
+  // el punto de la cuadrícula de 14 días (pasado o futuro) más cercano que sea >= fecha.
+  // Esto permite cargar clientes viejos (años atrás) y que se calculen todos los cortes
+  // históricos que debieron pasar hasta hoy, no solo desde el 11-9-2026 en adelante.
+  const offset = Math.ceil(diffFechaAncla/PERIODO_DIAS)*PERIODO_DIAS;
   return new Date(ANCLA_CORTE.getTime()+offset*DIA_MS).toISOString().slice(0,10);
 }
 
