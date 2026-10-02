@@ -83,6 +83,8 @@ header p{margin:7px 0 0;font-size:12px;color:#9BD6C8;}
 .resumen .celda .val{font-size:13.5px;color:var(--cover);font-weight:700;}
 .resumen .celda.pendiente{background:rgba(30,156,130,.10);border-color:var(--brass);}
 .resumen .celda.pendiente .val{color:var(--brass);}
+.resumen-periodo{margin-top:8px;margin-bottom:10px;}
+.resumen-periodo .celda .lbl{line-height:1.25;}
 
 label{display:block;font-size:12px;color:var(--ink-soft);margin:12px 0 5px;}
 label.inline-ico{display:flex;align-items:center;gap:6px;}
@@ -270,9 +272,14 @@ textarea{min-height:170px;font-family:ui-monospace,monospace;font-size:13px;}
 <div class="panel">
   <h2 class="panel-title"><svg class="ico"><use href="#i-wallet"/></svg> Tu cartera</h2>
   <div class="resumen">
-    <div class="celda"><div class="lbl">Prestado</div><div class="val num" id="rTotalPrestado">$0</div></div>
-    <div class="celda"><div class="lbl">Cobrado</div><div class="val num" id="rTotalCobrado">$0</div></div>
+    <div class="celda"><div class="lbl">Capital pendiente</div><div class="val num" id="rTotalPrestado">$0</div></div>
+    <div class="celda"><div class="lbl">Cobrado (mes actual)</div><div class="val num" id="rTotalCobrado">$0</div></div>
     <div class="celda pendiente"><div class="lbl">Pendiente</div><div class="val num" id="rTotalPendiente">$0</div></div>
+  </div>
+  <div class="resumen resumen-periodo">
+    <div class="celda"><div class="lbl">Cobrado bisemanal<br>(periodo actual)</div><div class="val num" id="rCobradoBisemanal">$0</div></div>
+    <div class="celda"><div class="lbl">Cobrado quincenal<br>(periodo actual)</div><div class="val num" id="rCobradoQuincenal">$0</div></div>
+    <div class="celda pendiente"><div class="lbl">Interes por cobrar</div><div class="val num" id="rInteresPorCobrar">$0</div></div>
   </div>
 
   <div id="filtrosClientes">
@@ -688,6 +695,24 @@ function primerCorte(frecuencia, fechaISO){
   return new Date(ANCLA_CORTE.getTime()+offset*DIA_MS).toISOString().slice(0,10);
 }
 
+// Inicio del período de cobro ACTUAL (el día siguiente al último corte ya
+// pasado, hasta hoy) según la frecuencia — usado solo para los recuadros de
+// "cobrado en el período actual", que se reinician en cada corte y por eso
+// no son acumulativos como Prestado/Cobrado/Pendiente.
+function inicioPeriodoActual(frecuencia, hoyISO){
+  const d = new Date(hoyISO+'T00:00:00');
+  if(frecuencia==='quincenal'){
+    const anio=d.getFullYear(), mes=d.getMonth(), dia=d.getDate();
+    if(dia<=15) return new Date(anio, mes, 1).toISOString().slice(0,10);
+    return new Date(anio, mes, 16).toISOString().slice(0,10);
+  }
+  const diff = Math.round((d-ANCLA_CORTE)/DIA_MS);
+  const offset = Math.floor(diff/PERIODO_DIAS)*PERIODO_DIAS;
+  const ultimoCorte = new Date(ANCLA_CORTE.getTime()+offset*DIA_MS);
+  ultimoCorte.setDate(ultimoCorte.getDate()+1);
+  return ultimoCorte.toISOString().slice(0,10);
+}
+
 // Corte siguiente al dado, según la frecuencia.
 function siguienteCorte(frecuencia, fechaCorteISO){
   if(frecuencia==='quincenal'){
@@ -786,16 +811,45 @@ function simularCuenta(pr, hastaISO){
 }
 
 function renderResumenGlobal(){
-  let prestado=0, cobrado=0, pendiente=0;
+  let prestado=0, cobradoMes=0, pendiente=0;
+  let cobradoBisemanal=0, cobradoQuincenal=0, interesPorCobrar=0;
+  const hoyActual = hoy();
+  const inicioMesActual = hoyActual.slice(0,7)+'-01';
+  const inicioBise = inicioPeriodoActual('bisemanal', hoyActual);
+  const inicioQuinc = inicioPeriodoActual('quincenal', hoyActual);
   DATA.prestatarios.forEach(pr=>{
     const c = simularCuenta(pr);
-    prestado += c.capitalTotal;
-    cobrado += c.pagado;
+    // Capital pendiente: baja con cada abono a capital (los pagos primero
+    // descuentan interés y el resto reduce capital) — ya no es un histórico
+    // de lo desembolsado, sino lo que realmente queda por cobrar de capital.
+    prestado += c.capital;
     pendiente += c.saldo;
+    // Interés por cobrar: el interés que queda pendiente ahora mismo, ya
+    // neto de los pagos recibidos (estos abonan primero al interés). Si un
+    // cliente pagó en el mes exactamente su interés, aquí queda en $0.
+    interesPorCobrar += c.interes;
+    // Cobrado: SOLO lo cobrado en el mes calendario actual (no histórico),
+    // con la misma lógica que usa el informe mensual, para que ambos
+    // números siempre coincidan si generas el informe del mes en curso.
+    (pr.pagos||[]).forEach(pg=>{
+      if(pg.fecha>=inicioMesActual && pg.fecha<=hoyActual) cobradoMes += pg.monto;
+    });
+    // Cobrado por frecuencia, SOLO dentro del período de pago actual (desde
+    // el último corte hasta hoy) — se reinicia en cada corte.
+    const frecuencia = pr.frecuencia || 'bisemanal';
+    const inicioPeriodo = frecuencia==='quincenal' ? inicioQuinc : inicioBise;
+    const pagadoPeriodo = c.historial
+      .filter(h=> h.tipo==='entrada' && h.fecha>=inicioPeriodo && h.fecha<=hoyActual)
+      .reduce((s,h)=> s+h.monto, 0);
+    if(frecuencia==='quincenal') cobradoQuincenal += pagadoPeriodo;
+    else cobradoBisemanal += pagadoPeriodo;
   });
   document.getElementById('rTotalPrestado').textContent = fmt(prestado);
-  document.getElementById('rTotalCobrado').textContent = fmt(cobrado);
+  document.getElementById('rTotalCobrado').textContent = fmt(cobradoMes);
   document.getElementById('rTotalPendiente').textContent = fmt(pendiente);
+  document.getElementById('rCobradoBisemanal').textContent = fmt(cobradoBisemanal);
+  document.getElementById('rCobradoQuincenal').textContent = fmt(cobradoQuincenal);
+  document.getElementById('rInteresPorCobrar').textContent = fmt(interesPorCobrar);
 }
 
 function iniciales(nombre){
